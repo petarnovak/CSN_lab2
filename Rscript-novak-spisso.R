@@ -22,11 +22,20 @@ colnames(lang.df) <- c("Language", "N", "Maximum degree", "M/N", "N/M")
 lang.df
 
 #2: Visualization
+# Function to plot the degree sequence of a given language
+degree_seq <- function(language){
+  path = paste("./data/",language,"_in-degree_sequence.txt",sep="")
+  degree_sequence = read.table(path, header = FALSE)
+}
+
 #Arabic
 
 #English
 degree_sequence = read.table("./data/English_in-degree_sequence.txt", header = FALSE)
 degree_spectrum = table(degree_sequence)
-x <- degree_spectrum
-x
-#
+degree_sequence
+plot(rownames(degree_sequence),degree_sequence[,1])
+barplot(degree_spectrum, main = "English",
+        xlab = "degree", ylab = "number of vertices")
+barplot(degree_spectrum, main = "English",
+        xlab = "degree", ylab = "number of vertices", log = "xy")
