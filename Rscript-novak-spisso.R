@@ -1,4 +1,4 @@
-#1: Introduction
+# 1: Introduction
 write_table <- function(language,file,lang.df) {
    degree_sequence = read.table(file, header = FALSE)
    lang.df <- rbind(lang.df,data.frame(language, length(degree_sequence$V1), max(degree_sequence$V1),
@@ -21,21 +21,18 @@ colnames(lang.df) <- c("Language", "N", "Maximum degree", "M/N", "N/M")
 #Table with all languages and some important values
 lang.df
 
-#2: Visualization
+# 2: Visualization
 # Function to plot the degree sequence of a given language
 degree_seq <- function(language){
   path = paste("./data/",language,"_in-degree_sequence.txt",sep="")
   degree_sequence = read.table(path, header = FALSE)
+  degree_spectrum = table(degree_sequence)
+  plot(rownames(degree_spectrum),degree_spectrum, main = language, log='xy', type = 'l', xlab = "degree", ylab = "number of vertices")
+  
 }
 
-#Arabic
+for (x in lang.df$Language){
+  degree_seq(x)
+}
 
-#English
-degree_sequence = read.table("./data/English_in-degree_sequence.txt", header = FALSE)
-degree_spectrum = table(degree_sequence)
-degree_sequence
-plot(rownames(degree_sequence),degree_sequence[,1])
-barplot(degree_spectrum, main = "English",
-        xlab = "degree", ylab = "number of vertices")
-barplot(degree_spectrum, main = "English",
-        xlab = "degree", ylab = "number of vertices", log = "xy")
+# 3: Distributions
