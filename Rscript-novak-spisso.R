@@ -37,8 +37,7 @@ for (x in 1:nrow(source)){
 require(stats4) # for MLE
 require(VGAM) # for the Riemann-zeta function
 
-# 4: Finding the best models
-mle_calc <- function(i,language,file,param.df){
+mle_calc <- function(i,language,file,param.df,AIC.df){
   # Geometric distribution
   minus_log_like_geo <- function(p){
     -(sum(x)-length(x)) * log(1-p) - length(x) * log(p)
@@ -60,7 +59,8 @@ mle_calc <- function(i,language,file,param.df){
   
   # Zeta (gamma=2) distribution
   minus_log_like_zeta2 <- function(){
-    length(x) * log(pi^2/6) + 2 * sum(log(x))
+    mle <- length(x) * log(pi^2/6) + 2 * sum(log(x))
+    return(mle)
   }
   
   # Right-truncated zeta distribution
@@ -88,29 +88,49 @@ mle_calc <- function(i,language,file,param.df){
   #                      method = "L-BFGS-B",
   #                      lower = c(1.0000001, 1),
   #                      upper = c(Inf, max(x)+1))
+  
+  # 4: Finding the best models
   best_p_geo <- attributes(summary(mle_geo))$coef[1]
   best_lambda_pois <- attributes(summary(mle_pois))$coef[1]
   best_gamma_zeta <- attributes(summary(mle_zeta))$coef[1]
   #best_gamma_zeta_trunc <- attributes(summary(mle_zeta_trunc))$coef[1]
   #best_h_max_zeta_trunc <- attributes(summary(mle_zeta_trunc))$coef[2]
   param.df <- rbind(param.df,data.frame(language, best_lambda_pois, best_p_geo, best_gamma_zeta))
-  return(param.df)
+  
+  # 5: Best model selection
+  get_AIC <- function(m2logL,K,N){
+    m2logL + 2*K*N/(N-K-1) # AIC with a correction for sample size
+  }
+  
+  AIC_list <- c()
+  AIC_list[1] <- get_AIC(attributes(summary(mle_geo))$m2logL,1,length(x))
+  AIC_list[2] <- get_AIC(attributes(summary(mle_pois))$m2logL,1,length(x))
+  AIC_list[3] <- get_AIC(attributes(summary(mle_zeta))$m2logL,1,length(x))
+  mle_zeta2 <- 2*minus_log_like_zeta2()
+  AIC_list[4] <- get_AIC(mle_zeta2,0,length(x))
+  #AIC_zeta_trunc <- get_AIC(attributes(summary(mle_zeta_trunc))$m2logL,2,length(x))
+  
+  best_AIC <- min(AIC_list)
+  AIC_list <- AIC_list-best_AIC
+  
+  AIC.df <- rbind(AIC.df,data.frame(language,t(AIC_list)))
+  return(list(param.df, AIC.df))
 }
 
 param.df <- data.frame() #table with most likely parameters
+AIC.df <- data.frame()
 
 for (i in 1:nrow(source)){
-  param.df <- mle_calc(i, source$language[i], source$file[i],param.df)
+  tables <- mle_calc(i, source$language[i], source$file[i],param.df,AIC.df)
+  param.df <- tables[[1]]
+  AIC.df <- tables[[2]]
 }
 
 colnames(param.df) <- c("Language", "lambda", "p", "gamma_1")
-#Table with the best parameters for every language
-param.df
+colnames(AIC.df) <- c("Language", "1", "2", "3", "4")
 
-# 5: Best model selection
-get_AIC <- function(m2logL,K,N){
-  m2logL + 2*K*N/(N-K-1) # AIC with a correction for sample size
-}
+param.df
+AIC.df
 
 # 6: Samples from discrete distribution
 folder_path <- "./samples_from_discrete_distributions/data"
