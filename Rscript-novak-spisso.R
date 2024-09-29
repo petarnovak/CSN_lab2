@@ -83,6 +83,7 @@ mle_calc <- function(i,language,file,param.df,AIC.df){
                   method = "L-BFGS-B",
                   lower = c(1.0000001))
   #This gives error for some languages
+  #The problem is how to choose the lowerbound for h_max!
   #mle_zeta_trunc <- mle(minus_log_like_zeta_trunc,
   #                      start = list(gamma = 2, h_max = max(x)),
   #                      method = "L-BFGS-B",
@@ -135,10 +136,127 @@ AIC.df
 # 6: Samples from discrete distribution
 folder_path <- "./samples_from_discrete_distributions/data"
 files <- list.files(path = folder_path, full.names = TRUE)
+prob_list <- c("geo 0.1","geo 0.2","geo 0.4","geo 0.05","geo 0.8","zeta 1.5","zeta 2.5",
+          "zeta 2","zeta 3.5","zeta 3")
 # Visualization (TO ADD FILE NAMES)
 for (file in files){
   degree_sequence = read.table(file, header = FALSE)
   degree_spectrum = table(degree_sequence)
   barplot(degree_spectrum, xlab = "degree", ylab = "number of vertices", log = "y")
 }
-geom_005 <- files[1]
+
+# I have rewritten / adjusted the code above with small changes to adapt to the new data
+# Probably we can write all in one function more generally
+# To avoid more complications for now I keep them separate
+write_table <- function(prob,file,prob.df) {
+  degree_sequence = read.table(file, header = FALSE)
+  prob.df <- rbind(prob.df,data.frame(prob, length(degree_sequence$V1), max(degree_sequence$V1),
+                                      sum(degree_sequence$V1)/length(degree_sequence$V1),
+                                      length(degree_sequence$V1)/sum(degree_sequence$V1)))
+  return(prob.df)
+}
+
+prob.df <- data.frame()
+
+for (x in 1:length(files)) {
+  prob.df <- write_table(prob_list[x], files[x],prob.df)
+}
+
+colnames(prob.df) <- c("Distribution", "N", "Maximum degree", "M/N", "N/M")
+prob.df
+
+mle_calc <- function(i,prob,file,param.df,AIC.df){
+  # Geometric distribution
+  minus_log_like_geo <- function(p){
+    -(sum(x)-length(x)) * log(1-p) - length(x) * log(p)
+  }
+  
+  # Poisson distribution
+  minus_log_like_pois <- function(lambda){
+    C <- 0
+    for (i in 1:length(x)) {
+      C = C + sum(log(2:x[i]))
+    }
+    - sum(x) * log(lambda) + length(x) * (lambda + log(1-exp(1)^(-lambda))) + C
+  }
+  
+  # Zeta distribution
+  minus_log_like_zeta <- function(gamma){
+    length(x) * log(zeta(gamma)) + gamma * sum(log(x))
+  }
+  
+  # Zeta (gamma=2) distribution
+  minus_log_like_zeta2 <- function(){
+    mle <- length(x) * log(pi^2/6) + 2 * sum(log(x))
+    return(mle)
+  }
+  
+  # Right-truncated zeta distribution
+  minus_log_like_zeta_trunc <- function(gamma,h_max){
+    length(x) * log(sum((1:h_max)^(-gamma))) + gamma * sum(log(x)) 
+  }
+  
+  x <- read.table(file, header = FALSE)$V1
+  mle_geo <- mle(minus_log_like_geo,
+                 start = list(p = lang.df$"N/M"[i]),
+                 method = "L-BFGS-B",
+                 lower = c(0.0000001),
+                 upper = c(0.9999999))
+  mle_pois <- mle(minus_log_like_pois,
+                  start = list(lambda = lang.df$"M/N"[i]),
+                  method = "L-BFGS-B",
+                  lower = c(1.0000001))
+  mle_zeta <- mle(minus_log_like_zeta,
+                  start = list(gamma = 2),
+                  method = "L-BFGS-B",
+                  lower = c(1.0000001))
+  #This gives error for some languages
+  #The problem is how to choose the lowerbound for h_max!
+  #mle_zeta_trunc <- mle(minus_log_like_zeta_trunc,
+  #                      start = list(gamma = 2, h_max = max(x)),
+  #                      method = "L-BFGS-B",
+  #                      lower = c(1.0000001, 1),
+  #                      upper = c(Inf, max(x)+1))
+  
+  # 4: Finding the best models
+  best_p_geo <- attributes(summary(mle_geo))$coef[1]
+  best_lambda_pois <- attributes(summary(mle_pois))$coef[1]
+  best_gamma_zeta <- attributes(summary(mle_zeta))$coef[1]
+  #best_gamma_zeta_trunc <- attributes(summary(mle_zeta_trunc))$coef[1]
+  #best_h_max_zeta_trunc <- attributes(summary(mle_zeta_trunc))$coef[2]
+  param.df <- rbind(param.df,data.frame(language, best_lambda_pois, best_p_geo, best_gamma_zeta))
+  
+  # 5: Best model selection
+  get_AIC <- function(m2logL,K,N){
+    m2logL + 2*K*N/(N-K-1) # AIC with a correction for sample size
+  }
+  
+  AIC_list <- c()
+  AIC_list[1] <- get_AIC(attributes(summary(mle_geo))$m2logL,1,length(x))
+  AIC_list[2] <- get_AIC(attributes(summary(mle_pois))$m2logL,1,length(x))
+  AIC_list[3] <- get_AIC(attributes(summary(mle_zeta))$m2logL,1,length(x))
+  mle_zeta2 <- 2*minus_log_like_zeta2()
+  AIC_list[4] <- get_AIC(mle_zeta2,0,length(x))
+  #AIC_zeta_trunc <- get_AIC(attributes(summary(mle_zeta_trunc))$m2logL,2,length(x))
+  
+  best_AIC <- min(AIC_list)
+  AIC_list <- AIC_list-best_AIC
+  
+  AIC.df <- rbind(AIC.df,data.frame(language,t(AIC_list)))
+  return(list(param.df, AIC.df))
+}
+
+param.df <- data.frame() #table with most likely parameters
+AIC.df <- data.frame()
+
+for (i in 1:nrow(source)){
+  tables <- mle_calc(i, source$language[i], source$file[i],param.df,AIC.df)
+  param.df <- tables[[1]]
+  AIC.df <- tables[[2]]
+}
+
+colnames(param.df) <- c("Language", "lambda", "p", "gamma_1")
+colnames(AIC.df) <- c("Language", "1", "2", "3", "4")
+
+param.df
+AIC.df
