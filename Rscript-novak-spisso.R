@@ -37,35 +37,6 @@ for (x in 1:nrow(source)){
 require(stats4) # for MLE
 require(VGAM) # for the Riemann-zeta function
 
-# Geometric distribution
-minus_log_like_geo <- function(p){
-  -(sum(x)-length(x)) * log(1-p) - length(x) * log(p)
-}
-
-# Poisson distribution
-minus_log_like_pois <- function(lambda){
-  C <- 0
-  for (i in 1:length(x)) {
-    C = C + sum(log(2:x[i]))
-  }
-  - sum(x) * log(lambda) + length(x) * (lambda + log(1-exp(1)^(-lambda))) + C
-}
-
-# Zeta distribution
-minus_log_like_zeta <- function(gamma){
-  length(x) * log(zeta(gamma)) + gamma * sum(log(x))
-}
-
-# Zeta (gamma=2) distribution
-minus_log_like_zeta2 <- function(){
-  length(x) * log(pi^2/6) + 2 * sum(log(x))
-}
-
-# Right-truncated zeta distribution
-minus_log_like_zeta_trunc <- function(gamma,h_max){
-  length(x) * log(sum((1:h_max)^(-gamma))) + gamma * sum(log(x)) 
-}
-
 # 4: Finding the best models
 mle_calc <- function(i,language,file,param.df){
   # Geometric distribution
