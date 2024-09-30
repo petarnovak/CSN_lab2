@@ -198,12 +198,12 @@ mle_calc <- function(i,prob,file,param.df,AIC.df){
   
   x <- read.table(file, header = FALSE)$V1
   mle_geo <- mle(minus_log_like_geo,
-                 start = list(p = lang.df$"N/M"[i]),
+                 start = list(p = prob.df$"N/M"[i]),
                  method = "L-BFGS-B",
                  lower = c(0.0000001),
                  upper = c(0.9999999))
   mle_pois <- mle(minus_log_like_pois,
-                  start = list(lambda = lang.df$"M/N"[i]),
+                  start = list(lambda = prob.df$"M/N"[i]),
                   method = "L-BFGS-B",
                   lower = c(1.0000001))
   mle_zeta <- mle(minus_log_like_zeta,
@@ -224,7 +224,7 @@ mle_calc <- function(i,prob,file,param.df,AIC.df){
   best_gamma_zeta <- attributes(summary(mle_zeta))$coef[1]
   #best_gamma_zeta_trunc <- attributes(summary(mle_zeta_trunc))$coef[1]
   #best_h_max_zeta_trunc <- attributes(summary(mle_zeta_trunc))$coef[2]
-  param.df <- rbind(param.df,data.frame(language, best_lambda_pois, best_p_geo, best_gamma_zeta))
+  param.df <- rbind(param.df,data.frame(prob, best_lambda_pois, best_p_geo, best_gamma_zeta))
   
   # 5: Best model selection
   get_AIC <- function(m2logL,K,N){
@@ -242,21 +242,21 @@ mle_calc <- function(i,prob,file,param.df,AIC.df){
   best_AIC <- min(AIC_list)
   AIC_list <- AIC_list-best_AIC
   
-  AIC.df <- rbind(AIC.df,data.frame(language,t(AIC_list)))
+  AIC.df <- rbind(AIC.df,data.frame(prob,t(AIC_list)))
   return(list(param.df, AIC.df))
 }
 
 param.df <- data.frame() #table with most likely parameters
 AIC.df <- data.frame()
 
-for (i in 1:nrow(source)){
-  tables <- mle_calc(i, source$language[i], source$file[i],param.df,AIC.df)
+for (i in 1:length(files)){
+  tables <- mle_calc(i, prob_list[i], files[i],param.df,AIC.df)
   param.df <- tables[[1]]
   AIC.df <- tables[[2]]
 }
 
-colnames(param.df) <- c("Language", "lambda", "p", "gamma_1")
-colnames(AIC.df) <- c("Language", "1", "2", "3", "4")
+colnames(param.df) <- c("Distribution", "lambda", "p", "gamma_1")
+colnames(AIC.df) <- c("Distribution", "1", "2", "3", "4")
 
 param.df
 AIC.df
