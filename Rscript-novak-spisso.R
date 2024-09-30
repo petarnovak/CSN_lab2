@@ -26,9 +26,10 @@ lang.df
 degree_plot <- function(language,file){
   degree_sequence = read.table(file, header = FALSE)
   degree_spectrum = table(degree_sequence)
-  barplot(degree_spectrum, main = language, xlab = "degree", ylab = "number of vertices", log = "y")
+  barplot(degree_spectrum/sum(degree_spectrum), main = language, xlab = "degree", ylab = "percentage of vertices", log = "y")
 }
 
+par(ask = TRUE) #We stop at each plot
 for (x in 1:nrow(source)){
   degree_plot(source$language[x], source$file[x])
 }
@@ -64,8 +65,8 @@ mle_calc <- function(i,language,file,param.df,AIC.df){
   }
   
   # Right-truncated zeta distribution
-  minus_log_like_zeta_trunc <- function(gamma,h_max){
-    length(x) * log(sum((1:h_max)^(-gamma))) + gamma * sum(log(x)) 
+  minus_log_like_zeta_trunc <- function(gamma){
+    length(x) * log(sum((1:max(x))^(-gamma))) + gamma * sum(log(x)) 
   }
   
   x <- read.table(file, header = FALSE)$V1
@@ -82,21 +83,20 @@ mle_calc <- function(i,language,file,param.df,AIC.df){
                   start = list(gamma = 2),
                   method = "L-BFGS-B",
                   lower = c(1.0000001))
-  #This gives error for some languages
-  #The problem is how to choose the lowerbound for h_max!
-  #mle_zeta_trunc <- mle(minus_log_like_zeta_trunc,
-  #                      start = list(gamma = 2, h_max = max(x)),
-  #                      method = "L-BFGS-B",
-  #                      lower = c(1.0000001, 1),
-  #                      upper = c(Inf, max(x)+1))
+  mle_zeta_trunc <- mle(minus_log_like_zeta_trunc,
+                        start = list(gamma = 2),
+                        method = "L-BFGS-B",
+                        lower = c(1.0000001))
   
   # 4: Finding the best models
   best_p_geo <- attributes(summary(mle_geo))$coef[1]
   best_lambda_pois <- attributes(summary(mle_pois))$coef[1]
   best_gamma_zeta <- attributes(summary(mle_zeta))$coef[1]
-  #best_gamma_zeta_trunc <- attributes(summary(mle_zeta_trunc))$coef[1]
-  #best_h_max_zeta_trunc <- attributes(summary(mle_zeta_trunc))$coef[2]
-  param.df <- rbind(param.df,data.frame(language, best_lambda_pois, best_p_geo, best_gamma_zeta))
+  best_gamma_zeta_trunc <- attributes(summary(mle_zeta_trunc))$coef[1]
+  best_h_max_zeta_trunc <- max(x)
+  param.df <- rbind(param.df,data.frame(language, best_lambda_pois, best_p_geo, 
+                                        best_gamma_zeta, best_gamma_zeta_trunc, 
+                                        best_h_max_zeta_trunc))
   
   # 5: Best model selection
   get_AIC <- function(m2logL,K,N){
@@ -109,7 +109,7 @@ mle_calc <- function(i,language,file,param.df,AIC.df){
   AIC_list[3] <- get_AIC(attributes(summary(mle_zeta))$m2logL,1,length(x))
   mle_zeta2 <- 2*minus_log_like_zeta2()
   AIC_list[4] <- get_AIC(mle_zeta2,0,length(x))
-  #AIC_zeta_trunc <- get_AIC(attributes(summary(mle_zeta_trunc))$m2logL,2,length(x))
+  AIC_list[5] <- get_AIC(attributes(summary(mle_zeta_trunc))$m2logL,1,length(x))
   
   best_AIC <- min(AIC_list)
   AIC_list <- AIC_list-best_AIC
@@ -127,22 +127,44 @@ for (i in 1:nrow(source)){
   AIC.df <- tables[[2]]
 }
 
-colnames(param.df) <- c("Language", "lambda", "p", "gamma_1")
-colnames(AIC.df) <- c("Language", "1", "2", "3", "4")
+colnames(param.df) <- c("Language", "lambda", "p", "gamma 1","gamma 2","k max")
+colnames(AIC.df) <- c("Language", "1", "2", "3", "4", "5")
 
 param.df
 AIC.df
+
+# Plots of distributions
+full_plot <- function(i,language,file){
+  degree_sequence = read.table(file, header = FALSE)
+  degree_spectrum = table(degree_sequence)
+  barplot(degree_spectrum/sum(degree_spectrum), main = language, xlab = "degree", ylab = "number of vertices")
+  
+  x_vals <- 1:rownames(degree_spectrum)[nrow(degree_spectrum)]
+  best_params <- param.df[i,]
+  geo <- dgeom(x_vals, prob = best_params$p)
+  lines(x_vals,geo)
+  #pois <- dpois(x_vals, lambda = best_params$lambda)
+}
+
+for (x in 1:nrow(source)){
+  full_plot(x,source$language[x], source$file[x])
+}
+
+#plot(x_vals, pmf_vals, type = "l", lwd = 2, col = "red",
+#     main = "PMF of Geometric Distribution (p = 0.2)", xlab = "Number of Failures", ylab = "Probability")
+
 
 # 6: Samples from discrete distribution
 folder_path <- "./samples_from_discrete_distributions/data"
 files <- list.files(path = folder_path, full.names = TRUE)
 prob_list <- c("geo 0.05","geo 0.1","geo 0.2","geo 0.4","geo 0.8","zeta 1.5","zeta 2.5",
           "zeta 2","zeta 3.5","zeta 3")
-# Visualization (TO ADD FILE NAMES)
-for (file in files){
-  degree_sequence = read.table(file, header = FALSE)
+
+# Visualization
+for (i in 1:length(files)){
+  degree_sequence = read.table(files[i], header = FALSE)
   degree_spectrum = table(degree_sequence)
-  barplot(degree_spectrum, xlab = "degree", ylab = "number of vertices", log = "y")
+  barplot(degree_spectrum, main = paste("Distribution :",prob_list[i]), xlab = "degree", ylab = "number of vertices", log = "y")
 }
 
 # I have rewritten / adjusted the code above with small changes to adapt to the new data
@@ -192,15 +214,15 @@ mle_calc <- function(i,prob,file,param.df,AIC.df){
   }
   
   # Right-truncated zeta distribution
-  minus_log_like_zeta_trunc <- function(gamma,h_max){
-    length(x) * log(sum((1:h_max)^(-gamma))) + gamma * sum(log(x)) 
+  minus_log_like_zeta_trunc <- function(gamma){
+    length(x) * log(sum((1:max(x))^(-gamma))) + gamma * sum(log(x)) 
   }
   
   x <- read.table(file, header = FALSE)$V1
   mle_geo <- mle(minus_log_like_geo,
                  start = list(p = prob.df$"N/M"[i]),
                  method = "L-BFGS-B",
-                 lower = c(0.01),
+                 lower = c(0.01), #problems with zeta: gamma = 1.5, with smaller values it crashes
                  upper = c(0.99))
   mle_pois <- mle(minus_log_like_pois,
                   start = list(lambda = prob.df$"M/N"[i]),
@@ -210,21 +232,20 @@ mle_calc <- function(i,prob,file,param.df,AIC.df){
                   start = list(gamma = 2),
                   method = "L-BFGS-B",
                   lower = c(1.0000001))
-  #This gives error for some languages
-  #The problem is how to choose the lowerbound for h_max!
-  #mle_zeta_trunc <- mle(minus_log_like_zeta_trunc,
-  #                      start = list(gamma = 2, h_max = max(x)),
-  #                      method = "L-BFGS-B",
-  #                      lower = c(1.0000001, 1),
-  #                      upper = c(Inf, max(x)+1))
+  mle_zeta_trunc <- mle(minus_log_like_zeta_trunc,
+                        start = list(gamma = 2),
+                        method = "L-BFGS-B",
+                        lower = c(1.0000001))
   
   # 4: Finding the best models
   best_p_geo <- attributes(summary(mle_geo))$coef[1]
   best_lambda_pois <- attributes(summary(mle_pois))$coef[1]
   best_gamma_zeta <- attributes(summary(mle_zeta))$coef[1]
-  #best_gamma_zeta_trunc <- attributes(summary(mle_zeta_trunc))$coef[1]
-  #best_h_max_zeta_trunc <- attributes(summary(mle_zeta_trunc))$coef[2]
-  param.df <- rbind(param.df,data.frame(prob, best_lambda_pois, best_p_geo, best_gamma_zeta))
+  best_gamma_zeta_trunc <- attributes(summary(mle_zeta_trunc))$coef[1]
+  best_h_max_zeta_trunc <- max(x)
+  param.df <- rbind(param.df,data.frame(prob, best_lambda_pois, best_p_geo, 
+                                        best_gamma_zeta, best_gamma_zeta_trunc,
+                                        best_h_max_zeta_trunc))
   
   # 5: Best model selection
   get_AIC <- function(m2logL,K,N){
@@ -237,7 +258,7 @@ mle_calc <- function(i,prob,file,param.df,AIC.df){
   AIC_list[3] <- get_AIC(attributes(summary(mle_zeta))$m2logL,1,length(x))
   mle_zeta2 <- 2*minus_log_like_zeta2()
   AIC_list[4] <- get_AIC(mle_zeta2,0,length(x))
-  #AIC_zeta_trunc <- get_AIC(attributes(summary(mle_zeta_trunc))$m2logL,2,length(x))
+  AIC_list[5] <- get_AIC(attributes(summary(mle_zeta_trunc))$m2logL,1,length(x))
   
   best_AIC <- min(AIC_list)
   AIC_list <- AIC_list-best_AIC
@@ -255,8 +276,8 @@ for (i in 1:length(files)){
   AIC.df <- tables[[2]]
 }
 
-colnames(param.df) <- c("Distribution", "lambda", "p", "gamma_1")
-colnames(AIC.df) <- c("Distribution", "1", "2", "3", "4")
+colnames(param.df) <- c("Distribution", "lambda", "p", "gamma 1","gamma 2","k max")
+colnames(AIC.df) <- c("Distribution", "1", "2", "3", "4","5")
 
 param.df
 AIC.df
