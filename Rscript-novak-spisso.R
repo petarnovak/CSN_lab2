@@ -136,7 +136,7 @@ AIC.df
 # 6: Samples from discrete distribution
 folder_path <- "./samples_from_discrete_distributions/data"
 files <- list.files(path = folder_path, full.names = TRUE)
-prob_list <- c("geo 0.1","geo 0.2","geo 0.4","geo 0.05","geo 0.8","zeta 1.5","zeta 2.5",
+prob_list <- c("geo 0.05","geo 0.1","geo 0.2","geo 0.4","geo 0.8","zeta 1.5","zeta 2.5",
           "zeta 2","zeta 3.5","zeta 3")
 # Visualization (TO ADD FILE NAMES)
 for (file in files){
@@ -200,8 +200,8 @@ mle_calc <- function(i,prob,file,param.df,AIC.df){
   mle_geo <- mle(minus_log_like_geo,
                  start = list(p = prob.df$"N/M"[i]),
                  method = "L-BFGS-B",
-                 lower = c(0.0000001),
-                 upper = c(0.9999999))
+                 lower = c(0.01),
+                 upper = c(0.99))
   mle_pois <- mle(minus_log_like_pois,
                   start = list(lambda = prob.df$"M/N"[i]),
                   method = "L-BFGS-B",
