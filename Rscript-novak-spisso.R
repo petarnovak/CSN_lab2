@@ -102,7 +102,7 @@ get_AIC <- function(m2logL,K,N){
   m2logL + 2*K*N/(N-K-1) # AIC with a correction for sample size
 }
 
-AIC_calc <- function(label, m2logL.list,df){
+AIC_calc <- function(label, m2logL.list,df,x){
   AIC.list <- sapply(m2logL.list,get_AIC,K=1,N=length(x))
   mle_zeta2 <- 2*minus_log_like_zeta2()
   AIC.list <- append(AIC.list,get_AIC(mle_zeta2,0,length(x)),after = 3)
@@ -119,7 +119,7 @@ for (i in 1:nrow(source)){
   x <- read.table(source$file[i], header = FALSE)$V1
   param.list <- mle_calc(lang.df$"N/M"[i],lang.df$"M/N"[i],x)
   param.df <- rbind(param.df,data.frame(source$language[i], param.list[1,],max(x)))
-  AIC.df <- AIC_calc(source$language[i],param.list[2,],AIC.df)
+  AIC.df <- AIC_calc(source$language[i],param.list[2,],AIC.df,x)
 }
 
 colnames(param.df) <- c("Language", "lambda", "p", "gamma 1","gamma 2","k max")
@@ -128,25 +128,55 @@ colnames(AIC.df) <- c("Language", "1", "2", "3", "4", "5")
 param.df
 AIC.df
 
-# Plots of distributions
-full_plot <- function(i,language,file){
+# Plots of distributions vs real data
+# Probability functions
+#Displaced geometric
+geo_dist <- function(p,k){
+  q <- (1-p)^(k-1)*p
+  return(q)
+}
+
+#Displaced poisson
+pois_dist <- function(lambda,k){
+  p <- (lambda^k) * exp(-lambda) / (factorial(k) * (1 - exp(-lambda)))
+}
+
+#Zeta truncated
+zetatrunc_dist <- function(k_max,gamma,k){
+  k^(-gamma)/(sum((1:k_max)^(-gamma)))
+}
+
+full_plot <- function(i,label,file,df){
   degree_sequence = read.table(file, header = FALSE)
-  degree_spectrum = table(degree_sequence)
-  barplot(degree_spectrum/sum(degree_spectrum), main = language, xlab = "degree", ylab = "number of vertices")
+  degree_spectrum = data.frame(table(degree_sequence))
   
-  x_vals <- 1:rownames(degree_spectrum)[nrow(degree_spectrum)]
-  best_params <- param.df[i,]
-  geo <- dgeom(x_vals, prob = best_params$p)
-  lines(x_vals,geo)
-  #pois <- dpois(x_vals, lambda = best_params$lambda)
+  plot(degree_spectrum$V1,degree_spectrum$Freq/nrow(degree_sequence),main = label,
+       ylim = c(10^(-6),1), xlab = "degree", ylab = "Number of vertices",log="y")
+  
+  x <- 1:max(degree_sequence)
+  
+  geo_prob <- sapply(x, geo_dist,p=df$p[i])
+  lines(x,geo_prob,type="l",col = "blue")
+  
+  pois_prob <- sapply(x, pois_dist,lambda=df$lambda[i])
+  lines(x,pois_prob,type="l",col = "green")
+  
+  zeta_prob <- sapply(x, dzeta, shape = df$`gamma 1`[i])
+  lines(x,zeta_prob,type="l",col = "red")
+  
+  zeta2_prob <- sapply(x, dzeta, shape = 2)
+  lines(x,zeta2_prob,type="l",col = "yellow")
+  
+  zetatrunc_prob <- sapply(x, zetatrunc_dist, gamma = df$`gamma 2`[i], 
+                           k_max = df$`k max`[i])
+  lines(x,zetatrunc_prob,type="l",col = "orange")
+  legend("topright", legend = c("Geometric", "Poisson", "Zeta", "Zeta (Lambda=2)", "Zeta truncated"), 
+         col = c("blue","green","red","yellow","orange"), lty = 1, lwd = 2)
 }
 
 for (x in 1:nrow(source)){
-  full_plot(x,source$language[x], source$file[x])
+  full_plot(x,source$language[x], source$file[x],param.df)
 }
-
-#plot(x_vals, pmf_vals, type = "l", lwd = 2, col = "red",
-#     main = "PMF of Geometric Distribution (p = 0.2)", xlab = "Number of Failures", ylab = "Probability")
 
 
 # 6: Samples from discrete distribution
@@ -187,6 +217,12 @@ colnames(AIC.sample.df) <- c("Distribution", "1", "2", "3", "4","5")
 
 param.sample.df
 AIC.sample.df
+
+# Plots of distributions vs sample data
+for (x in 1:length(files)){
+  full_plot(x,prob_list[x],files[x],param.sample.df)
+}
+
 
 # Additional work
 # Altmann distribution
