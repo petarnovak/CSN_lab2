@@ -1,4 +1,5 @@
 # 1: Introduction
+library(xtable)
 write_table <- function(label,file,df) {
    degree_sequence = read.table(file, header = FALSE)
    df <- rbind(df,data.frame(label, length(degree_sequence$V1), max(degree_sequence$V1),
@@ -20,13 +21,14 @@ for (x in 1:nrow(source)) {
 colnames(lang.df) <- c("Language", "N", "Maximum degree", "M/N", "N/M")
 #Table with all languages and some important values
 lang.df
+print(xtable(lang.df), file = "Table 1.tex")
 
 # 2: Visualization
 # Function to plot the degree sequence of a given language
 degree_plot <- function(language,file){
   degree_sequence = read.table(file, header = FALSE)
   degree_spectrum = table(degree_sequence)
-  barplot(degree_spectrum/sum(degree_spectrum), main = language, xlab = "degree", ylab = "percentage of vertices", log = "y")
+  barplot(degree_spectrum, main = language, xlab = "degree", ylab = "Number of vertices", log = "y")
 }
 
 par(ask = TRUE) #We stop at each plot
@@ -126,7 +128,9 @@ colnames(param.df) <- c("Language", "lambda", "p", "gamma 1","gamma 2","k max")
 colnames(AIC.df) <- c("Language", "1", "2", "3", "4", "5")
 
 param.df
+print(xtable(param.df), file = "Table Parametri.tex")
 AIC.df
+print(xtable(AIC.df), file = "Table AIC.tex")
 
 # Plots of distributions vs real data
 # Probability functions
@@ -149,9 +153,9 @@ zetatrunc_dist <- function(k_max,gamma,k){
 full_plot <- function(i,label,file,df){
   degree_sequence = read.table(file, header = FALSE)
   degree_spectrum = data.frame(table(degree_sequence))
-  
-  plot(degree_spectrum$V1,degree_spectrum$Freq/nrow(degree_sequence),main = label,
-       ylim = c(10^(-6),1), xlab = "degree", ylab = "Number of vertices",log="y")
+  #VA SISTEMATO, VANNO MESSI I PUNTINI/DELLE LINEE
+  plot(degree_spectrum$V1,degree_spectrum$Freq/nrow(degree_sequence),main = label,type="l",
+       ylim = c(10^(-6),1), xlab = "degree", ylab = "Proportion of vertices",log="y")
   
   x <- 1:max(degree_sequence)
   
@@ -165,13 +169,13 @@ full_plot <- function(i,label,file,df){
   lines(x,zeta_prob,type="l",col = "red")
   
   zeta2_prob <- sapply(x, dzeta, shape = 2)
-  lines(x,zeta2_prob,type="l",col = "yellow")
+  lines(x,zeta2_prob,type="l",col = "magenta")
   
   zetatrunc_prob <- sapply(x, zetatrunc_dist, gamma = df$`gamma 2`[i], 
                            k_max = df$`k max`[i])
   lines(x,zetatrunc_prob,type="l",col = "orange")
   legend("topright", legend = c("Geometric", "Poisson", "Zeta", "Zeta (Lambda=2)", "Zeta truncated"), 
-         col = c("blue","green","red","yellow","orange"), lty = 1, lwd = 2)
+         col = c("blue","green","red","magenta","orange"), lty = 1, lwd = 2)
 }
 
 for (x in 1:nrow(source)){
@@ -219,6 +223,7 @@ param.sample.df
 AIC.sample.df
 
 # Plots of distributions vs sample data
+# NOTE: the code requires a lot of time to plot gamma 1.5
 for (x in 1:length(files)){
   full_plot(x,prob_list[x],files[x],param.sample.df)
 }
@@ -229,12 +234,28 @@ for (x in 1:length(files)){
 minus_log_like_altmann <- function(gamma,delta){
   gamma * sum(log(x)) + delta * sum(x) + sum(log(sum(x^(-gamma)*exp(-delta*x))))
 }
-x <- read.table(source$file[1], header = FALSE)$V1
+
+altmann_dist <- function(gamma,delta,k,N){
+  k^(-gamma) * exp(-delta * k) * (1/sum((1:N)^(-gamma) * exp(-delta * (1:N))))
+}
+
+degree_sequence = read.table(files[1], header = FALSE)
+degree_spectrum = data.frame(table(degree_sequence))
+x = degree_sequence
 mle_altmann <- mle(minus_log_like_altmann,
-               start = list(gamma = 2, delta = 0.01),
-               method = "L-BFGS-B",
-               lower = c(1.000001,0))
+                   start = list(gamma = 2, delta = 0.01),
+                   method = "L-BFGS-B",
+                   lower = c(0.000001,0.001))
 
 mle_altmann
-attributes(summary(mle_altmann))$coef[1]
-attributes(summary(mle_altmann))$m2logL
+altmann_gamma <- attributes(summary(mle_altmann))$coef[1]
+altmann_delta <- attributes(summary(mle_altmann))$coef[2]
+
+plot(degree_spectrum$V1,degree_spectrum$Freq/nrow(degree_sequence),main = "Geo 0.05",
+     ylim = c(10^(-6),1), xlab = "degree", ylab = "Number of vertices",log="y")
+
+z <- 1:max(degree_sequence)
+
+altmann_prob <- sapply(z, altmann_dist,gamma=0.5,delta=0.01,N=max(x))
+lines(z,altmann_prob,type="l",col = "blue")
+minus_log_like_altmann(0.5,0.01)
