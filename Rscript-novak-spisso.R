@@ -1,10 +1,10 @@
 # 1: Introduction
-write_table <- function(language,file,lang.df) {
+write_table <- function(label,file,df) {
    degree_sequence = read.table(file, header = FALSE)
-   lang.df <- rbind(lang.df,data.frame(language, length(degree_sequence$V1), max(degree_sequence$V1),
+   lang.df <- rbind(df,data.frame(label, length(degree_sequence$V1), max(degree_sequence$V1),
                                        sum(degree_sequence$V1)/length(degree_sequence$V1),
                                        length(degree_sequence$V1)/sum(degree_sequence$V1)))
-   return(lang.df)
+   return(df)
    }
 
 source = read.table("list_in.txt", 
@@ -38,93 +38,88 @@ for (x in 1:nrow(source)){
 require(stats4) # for MLE
 require(VGAM) # for the Riemann-zeta function
 
-mle_calc <- function(i,language,file,param.df,AIC.df){
-  # Geometric distribution
-  minus_log_like_geo <- function(p){
-    -(sum(x)-length(x)) * log(1-p) - length(x) * log(p)
+# Geometric distribution
+minus_log_like_geo <- function(p){
+  -(sum(x)-length(x)) * log(1-p) - length(x) * log(p)
+}
+
+# Poisson distribution
+minus_log_like_pois <- function(lambda){
+  C <- 0
+  for (i in 1:length(x)) {
+    C = C + sum(log(2:x[i]))
   }
-  
-  # Poisson distribution
-  minus_log_like_pois <- function(lambda){
-    C <- 0
-    for (i in 1:length(x)) {
-      C = C + sum(log(2:x[i]))
-    }
-    - sum(x) * log(lambda) + length(x) * (lambda + log(1-exp(1)^(-lambda))) + C
-  }
-  
-  # Zeta distribution
-  minus_log_like_zeta <- function(gamma){
-    length(x) * log(zeta(gamma)) + gamma * sum(log(x))
-  }
-  
-  # Zeta (gamma=2) distribution
-  minus_log_like_zeta2 <- function(){
-    mle <- length(x) * log(pi^2/6) + 2 * sum(log(x))
-    return(mle)
-  }
-  
-  # Right-truncated zeta distribution
-  minus_log_like_zeta_trunc <- function(gamma){
-    length(x) * log(sum((1:max(x))^(-gamma))) + gamma * sum(log(x)) 
-  }
-  
-  x <- read.table(file, header = FALSE)$V1
+  - sum(x) * log(lambda) + length(x) * (lambda + log(1-exp(1)^(-lambda))) + C
+}
+
+# Zeta distribution
+minus_log_like_zeta <- function(gamma){
+  length(x) * log(zeta(gamma)) + gamma * sum(log(x))
+}
+
+# Zeta (gamma=2) distribution
+minus_log_like_zeta2 <- function(){
+  mle <- length(x) * log(pi^2/6) + 2 * sum(log(x))
+  return(mle)
+}
+
+# Right-truncated zeta distribution
+minus_log_like_zeta_trunc <- function(gamma){
+  length(x) * log(sum((1:max(x))^(-gamma))) + gamma * sum(log(x)) 
+}
+
+# Function to calculate the mle useful parameters
+mle_calc <- function(p,lambda,x){
   mle_geo <- mle(minus_log_like_geo,
-                 start = list(p = lang.df$"N/M"[i]),
+                 start = list(p = p),
                  method = "L-BFGS-B",
                  lower = c(0.0000001),
                  upper = c(0.9999999))
+  geo_par <- c(attributes(summary(mle_geo))$coef[1],attributes(summary(mle_geo))$m2logL)
   mle_pois <- mle(minus_log_like_pois,
-                  start = list(lambda = lang.df$"M/N"[i]),
+                  start = list(lambda = lambda),
                   method = "L-BFGS-B",
                   lower = c(1.0000001))
+  pois_par <- c(attributes(summary(mle_pois))$coef[1],attributes(summary(mle_pois))$m2logL)
   mle_zeta <- mle(minus_log_like_zeta,
                   start = list(gamma = 2),
                   method = "L-BFGS-B",
                   lower = c(1.0000001))
+  zeta_par <- c(attributes(summary(mle_zeta))$coef[1],attributes(summary(mle_zeta))$m2logL)
   mle_zeta_trunc <- mle(minus_log_like_zeta_trunc,
                         start = list(gamma = 2),
                         method = "L-BFGS-B",
                         lower = c(1.0000001))
-  
-  # 4: Finding the best models
-  best_p_geo <- attributes(summary(mle_geo))$coef[1]
-  best_lambda_pois <- attributes(summary(mle_pois))$coef[1]
-  best_gamma_zeta <- attributes(summary(mle_zeta))$coef[1]
-  best_gamma_zeta_trunc <- attributes(summary(mle_zeta_trunc))$coef[1]
-  best_h_max_zeta_trunc <- max(x)
-  param.df <- rbind(param.df,data.frame(language, best_lambda_pois, best_p_geo, 
-                                        best_gamma_zeta, best_gamma_zeta_trunc, 
-                                        best_h_max_zeta_trunc))
-  
-  # 5: Best model selection
-  get_AIC <- function(m2logL,K,N){
-    m2logL + 2*K*N/(N-K-1) # AIC with a correction for sample size
-  }
-  
-  AIC_list <- c()
-  AIC_list[1] <- get_AIC(attributes(summary(mle_geo))$m2logL,1,length(x))
-  AIC_list[2] <- get_AIC(attributes(summary(mle_pois))$m2logL,1,length(x))
-  AIC_list[3] <- get_AIC(attributes(summary(mle_zeta))$m2logL,1,length(x))
-  mle_zeta2 <- 2*minus_log_like_zeta2()
-  AIC_list[4] <- get_AIC(mle_zeta2,0,length(x))
-  AIC_list[5] <- get_AIC(attributes(summary(mle_zeta_trunc))$m2logL,1,length(x))
-  
-  best_AIC <- min(AIC_list)
-  AIC_list <- AIC_list-best_AIC
-  
-  AIC.df <- rbind(AIC.df,data.frame(language,t(AIC_list)))
-  return(list(param.df, AIC.df))
+  zeta_trunc_par <- c(attributes(summary(mle_zeta_trunc))$coef[1],
+                      attributes(summary(mle_zeta_trunc))$m2logL)
+  df <- data.frame(pois_par,geo_par,zeta_par,zeta_trunc_par)
+  colnames(df) <- NULL
+  return(df)
 }
 
-param.df <- data.frame() #table with most likely parameters
-AIC.df <- data.frame()
+# Functions to calculate the AIC
+get_AIC <- function(m2logL,K,N){
+  m2logL + 2*K*N/(N-K-1) # AIC with a correction for sample size
+}
+
+AIC_calc <- function(label, m2logL.list,df){
+  AIC.list <- sapply(m2logL.list,get_AIC,K=1,N=length(x))
+  mle_zeta2 <- 2*minus_log_like_zeta2()
+  AIC.list <- append(AIC.list,get_AIC(mle_zeta2,0,length(x)),after = 3)
+  best.AIC <- min(AIC.list)
+  AIC.list <- AIC.list-best.AIC
+  df <- rbind(df,data.frame(label,t(AIC.list)))
+  return(df)
+}
+
+param.df <- data.frame() #table with best parameters
+AIC.df <- data.frame() #AIC table
 
 for (i in 1:nrow(source)){
-  tables <- mle_calc(i, source$language[i], source$file[i],param.df,AIC.df)
-  param.df <- tables[[1]]
-  AIC.df <- tables[[2]]
+  x <- read.table(source$file[i], header = FALSE)$V1
+  param.list <- mle_calc(lang.df$"N/M"[i],lang.df$"M/N"[i],x)
+  param.df <- rbind(param.df,data.frame(source$language[i], param.list[1,],max(x)))
+  AIC.df <- AIC_calc(source$language[i],param.list[2,],AIC.df)
 }
 
 colnames(param.df) <- c("Language", "lambda", "p", "gamma 1","gamma 2","k max")
@@ -167,17 +162,9 @@ for (i in 1:length(files)){
   barplot(degree_spectrum, main = paste("Distribution :",prob_list[i]), xlab = "degree", ylab = "number of vertices", log = "y")
 }
 
-# I have rewritten / adjusted the code above with small changes to adapt to the new data
-# Probably we can write all in one function more generally
-# To avoid more complications for now I keep them separate
-write_table <- function(prob,file,prob.df) {
-  degree_sequence = read.table(file, header = FALSE)
-  prob.df <- rbind(prob.df,data.frame(prob, length(degree_sequence$V1), max(degree_sequence$V1),
-                                      sum(degree_sequence$V1)/length(degree_sequence$V1),
-                                      length(degree_sequence$V1)/sum(degree_sequence$V1)))
-  return(prob.df)
-}
-
+#
+# WORK IN PROGRESS
+#
 prob.df <- data.frame()
 
 for (x in 1:length(files)) {
