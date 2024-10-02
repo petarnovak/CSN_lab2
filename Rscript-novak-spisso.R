@@ -75,8 +75,8 @@ mle_calc <- function(p,lambda,x){
   mle_geo <- mle(minus_log_like_geo,
                  start = list(p = p),
                  method = "L-BFGS-B",
-                 lower = c(0.01),
-                 upper = c(0.99))
+                 lower = c(0.001),
+                 upper = c(0.999))
   geo_par <- c(attributes(summary(mle_geo))$coef[1],attributes(summary(mle_geo))$m2logL)
   mle_pois <- mle(minus_log_like_pois,
                   start = list(lambda = lambda),
@@ -111,17 +111,20 @@ AIC_calc <- function(label, m2logL.list,df,x){
   best.AIC <- min(AIC.list)
   AIC.list <- AIC.list-best.AIC
   df <- rbind(df,data.frame(label,t(AIC.list)))
-  return(df)
+  return(list(AICdf = df, AICbest = best.AIC))
 }
 
 param.df <- data.frame() #table with best parameters
 AIC.df <- data.frame() #AIC table
+bestAIC.list <- list()
 
 for (i in 1:nrow(source)){
   x <- read.table(source$file[i], header = FALSE)$V1
   param.list <- mle_calc(lang.df$"N/M"[i],lang.df$"M/N"[i],x)
   param.df <- rbind(param.df,data.frame(source$language[i], param.list[1,],max(x)))
-  AIC.df <- AIC_calc(source$language[i],param.list[2,],AIC.df,x)
+  AIC <- AIC_calc(source$language[i],param.list[2,],AIC.df,x)
+  AIC.df <- AIC$AICdf
+  bestAIC.list[i] <- AIC$AICbest
 }
 
 colnames(param.df) <- c("Language", "lambda", "p", "gamma 1","gamma 2","k max")
@@ -152,28 +155,30 @@ zetatrunc_dist <- function(k_max,gamma,k){
 
 full_plot <- function(i,label,file,df){
   degree_sequence = read.table(file, header = FALSE)
-  degree_spectrum = data.frame(table(degree_sequence))
-  #VA SISTEMATO, VANNO MESSI I PUNTINI/DELLE LINEE
-  plot(degree_spectrum$V1,degree_spectrum$Freq/nrow(degree_sequence),main = label,type="l",
-       ylim = c(10^(-6),1), xlab = "degree", ylab = "Proportion of vertices",log="y")
+  degree_spectrum = table(degree_sequence) 
+  barplot(degree_spectrum, main = label, xlab = "degree", 
+          ylab = "Number of vertices", log = "y")
+  #degree_spectrum = data.frame(table(degree_sequence))
+  #plot(degree_spectrum$V1,degree_spectrum$Freq,main = label,type="l",
+  #     xlab = "degree", ylab = "Number of vertices",log="y")
   
   x <- 1:max(degree_sequence)
   
   geo_prob <- sapply(x, geo_dist,p=df$p[i])
-  lines(x,geo_prob,type="l",col = "blue")
+  lines(x,geo_prob*nrow(degree_sequence),type="l",col = "blue",lwd = 3)
   
   pois_prob <- sapply(x, pois_dist,lambda=df$lambda[i])
-  lines(x,pois_prob,type="l",col = "green")
+  lines(x,pois_prob*nrow(degree_sequence),type="l",col = "green",lwd = 3)
   
   zeta_prob <- sapply(x, dzeta, shape = df$`gamma 1`[i])
-  lines(x,zeta_prob,type="l",col = "red")
+  lines(x,zeta_prob*nrow(degree_sequence),type="l",col = "orange",lwd = 3)
   
   zeta2_prob <- sapply(x, dzeta, shape = 2)
-  lines(x,zeta2_prob,type="l",col = "magenta")
+  lines(x,zeta2_prob*nrow(degree_sequence),type="l",col = "magenta",lwd = 3)
   
   zetatrunc_prob <- sapply(x, zetatrunc_dist, gamma = df$`gamma 2`[i], 
                            k_max = df$`k max`[i])
-  lines(x,zetatrunc_prob,type="l",col = "orange")
+  lines(x,zetatrunc_prob*nrow(degree_sequence),type="l",col = "red",lwd = 3)
   legend("topright", legend = c("Geometric", "Poisson", "Zeta", "Zeta (Lambda=2)", "Zeta truncated"), 
          col = c("blue","green","red","magenta","orange"), lty = 1, lwd = 2)
 }
@@ -213,7 +218,7 @@ for (i in 1:length(files)){
   x <- read.table(files[i], header = FALSE)$V1
   param.list <- mle_calc(prob.df$"N/M"[i],prob.df$"M/N"[i],x)
   param.sample.df <- rbind(param.sample.df,data.frame(prob.df$Distribution[i], param.list[1,],max(x)))
-  AIC.sample.df <- AIC_calc(prob.df$Distribution[i],param.list[2,],AIC.sample.df)
+  AIC.sample.df <- AIC_calc(prob.df$Distribution[i],param.list[2,],AIC.sample.df,x)
 }
 
 colnames(param.sample.df) <- c("Distribution", "lambda", "p", "gamma 1","gamma 2","k max")
@@ -232,27 +237,43 @@ for (x in 1:length(files)){
 # Additional work
 # Altmann distribution
 minus_log_like_altmann <- function(gamma,delta){
-  gamma * sum(log(x)) + delta * sum(x) + sum(log(sum(x^(-gamma)*exp(-delta*x))))
+  gamma * sum(log(x)) + delta * sum(x) + length(x)*log(sum(((1:length(x))^(-gamma)*exp(-delta*(1:length(x))))))
 }
 
 altmann_dist <- function(gamma,delta,k,N){
   k^(-gamma) * exp(-delta * k) * (1/sum((1:N)^(-gamma) * exp(-delta * (1:N))))
 }
 
-degree_sequence = read.table(files[1], header = FALSE)
-degree_spectrum = data.frame(table(degree_sequence))
-x = degree_sequence
-mle_altmann <- mle(minus_log_like_altmann,
-                   start = list(gamma = 2, delta = 0.01),
-                   method = "L-BFGS-B",
-                   lower = c(0.000001,0.001))
+altmann.param <- data.frame()
 
-mle_altmann
-altmann_gamma <- attributes(summary(mle_altmann))$coef[1]
-altmann_delta <- attributes(summary(mle_altmann))$coef[2]
+for (i in 1:nrow(source)){
+  degree_sequence <- read.table(source$file[i], header = FALSE)
+  x <- degree_sequence$V1
+  mle_altmann <- mle(minus_log_like_altmann,
+                     start = list(gamma = 2, delta = 0.01),
+                     method = "L-BFGS-B",
+                     lower = c(0.001,0.001))
+  alt.gamma <- attributes(summary(mle_altmann))$coef[1]
+  alt.delta <- attributes(summary(mle_altmann))$coef[2]
+  altmann.AIC <- get_AIC(attributes(summary(mle_altmann))$m2logL,2,length(x)) - bestAIC.list[[i]]
+  altmann.param <- rbind(altmann.param,data.frame(alt.gamma,alt.delta,altmann.AIC))
+  degree_spectrum = table(degree_sequence)
+  barplot(degree_spectrum, main = source$language[i], xlab = "degree", 
+          ylab = "Number of vertices", log = "y")
+  
+  z <- 1:max(degree_sequence)
+  altmann_prob <- sapply(z, altmann_dist,gamma=alt.gamma,delta=alt.delta,N=max(x))
+  lines(z,altmann_prob*nrow(degree_sequence),type="l",col = "red",lwd = 3)
+}
 
-plot(degree_spectrum$V1,degree_spectrum$Freq/nrow(degree_sequence),main = "Geo 0.05",
-     ylim = c(10^(-6),1), xlab = "degree", ylab = "Number of vertices",log="y")
+colnames(altmann.param) <- c("gamma", "delta", "Alt.AIC-best.AIC")
+
+altmann.param
+print(xtable(altmann.param), file = "Table Altmann.tex")
+
+
+plot(degree_spectrum$V1,degree_spectrum,main = "Geo 0.05", xlab = "degree", 
+     ylab = "Number of vertices",log="y")
 
 z <- 1:max(degree_sequence)
 
