@@ -1,4 +1,4 @@
-# 1: Introduction
+# INTRODUCTION
 library(xtable)
 write_table <- function(label,file,df) {
    degree_sequence = read.table(file, header = FALSE)
@@ -19,24 +19,11 @@ for (x in 1:nrow(source)) {
   lang.df <- write_table(source$language[x], source$file[x],lang.df)
 }
 colnames(lang.df) <- c("Language", "N", "Maximum degree", "M/N", "N/M")
-#Table with all languages and some important values
-lang.df
+
+lang.df #Table with all languages and some important values
 print(xtable(lang.df), file = "Table 1.tex")
 
-# 2: Visualization
-# Function to plot the degree sequence of a given language
-degree_plot <- function(language,file){
-  degree_sequence = read.table(file, header = FALSE)
-  degree_spectrum = table(degree_sequence)
-  barplot(degree_spectrum, main = language, xlab = "degree", ylab = "Number of vertices", log = "y")
-}
-
-par(ask = TRUE) #We stop at each plot
-for (x in 1:nrow(source)){
-  degree_plot(source$language[x], source$file[x])
-}
-
-# 3: Log-likelihood function
+# LOG-LIKELIHOOD
 require(stats4) # for MLE
 require(VGAM) # for the Riemann-zeta function
 
@@ -75,8 +62,8 @@ mle_calc <- function(p,lambda,x){
   mle_geo <- mle(minus_log_like_geo,
                  start = list(p = p),
                  method = "L-BFGS-B",
-                 lower = c(0.001),
-                 upper = c(0.999))
+                 lower = c(0.01),
+                 upper = c(0.99))
   geo_par <- c(attributes(summary(mle_geo))$coef[1],attributes(summary(mle_geo))$m2logL)
   mle_pois <- mle(minus_log_like_pois,
                   start = list(lambda = lambda),
@@ -99,7 +86,7 @@ mle_calc <- function(p,lambda,x){
   return(df)
 }
 
-# Functions to calculate the AIC
+# AIC
 get_AIC <- function(m2logL,K,N){
   m2logL + 2*K*N/(N-K-1) # AIC with a correction for sample size
 }
@@ -116,7 +103,7 @@ AIC_calc <- function(label, m2logL.list,df,x){
 
 param.df <- data.frame() #table with best parameters
 AIC.df <- data.frame() #AIC table
-bestAIC.list <- list()
+bestAIC.list <- list() #list with best AIC for every language
 
 for (i in 1:nrow(source)){
   x <- read.table(source$file[i], header = FALSE)$V1
@@ -135,7 +122,7 @@ print(xtable(param.df), file = "Table Parametri.tex")
 AIC.df
 print(xtable(AIC.df), file = "Table AIC.tex")
 
-# Plots of distributions vs real data
+# PLOTS
 # Probability functions
 #Displaced geometric
 geo_dist <- function(p,k){
@@ -158,9 +145,6 @@ full_plot <- function(i,label,file,df){
   degree_spectrum = table(degree_sequence) 
   barplot(degree_spectrum, main = label, xlab = "degree", 
           ylab = "Number of vertices", log = "y")
-  #degree_spectrum = data.frame(table(degree_sequence))
-  #plot(degree_spectrum$V1,degree_spectrum$Freq,main = label,type="l",
-  #     xlab = "degree", ylab = "Number of vertices",log="y")
   
   x <- 1:max(degree_sequence)
   
@@ -188,13 +172,13 @@ for (x in 1:nrow(source)){
 }
 
 
-# 6: Samples from discrete distribution
+# SAMPLES FROM DISCRETE DISTRIBUTIONS
 folder_path <- "./samples_from_discrete_distributions/data"
 files <- list.files(path = folder_path, full.names = TRUE)
 prob_list <- c("geo 0.05","geo 0.1","geo 0.2","geo 0.4","geo 0.8","zeta 1.5","zeta 2.5",
           "zeta 2","zeta 3.5","zeta 3")
 
-# Introduction
+# INTRODUCTION
 prob.df <- data.frame()
 
 for (x in 1:length(files)) {
@@ -203,38 +187,37 @@ for (x in 1:length(files)) {
 
 colnames(prob.df) <- c("Distribution", "N", "Maximum degree", "M/N", "N/M")
 prob.df
+print(xtable(prob.df), file = "Table sample.tex")
 
-# Visualization
-for (i in 1:length(files)){
-  degree_sequence = read.table(files[i], header = FALSE)
-  degree_spectrum = table(degree_sequence)
-  barplot(degree_spectrum, main = paste("Distribution :",prob_list[i]), xlab = "degree", ylab = "number of vertices", log = "y")
-}
-
+# LOG-LIKELIHOOD & AIC
 param.sample.df <- data.frame() #table with best parameters
 AIC.sample.df <- data.frame() #AIC table
+bestAIC.list <- list()#list with best AIC for every distribution
 
 for (i in 1:length(files)){
   x <- read.table(files[i], header = FALSE)$V1
   param.list <- mle_calc(prob.df$"N/M"[i],prob.df$"M/N"[i],x)
   param.sample.df <- rbind(param.sample.df,data.frame(prob.df$Distribution[i], param.list[1,],max(x)))
-  AIC.sample.df <- AIC_calc(prob.df$Distribution[i],param.list[2,],AIC.sample.df,x)
+  AIC <- AIC_calc(prob.df$Distribution[i],param.list[2,],AIC.sample.df,x)
+  AIC.sample.df <- AIC$AICdf
+  bestAIC.list[i] <- AIC$AICbest
 }
 
 colnames(param.sample.df) <- c("Distribution", "lambda", "p", "gamma 1","gamma 2","k max")
 colnames(AIC.sample.df) <- c("Distribution", "1", "2", "3", "4","5")
 
 param.sample.df
+print(xtable(param.sample.df), file = "Table Parametri sample.tex")
 AIC.sample.df
+print(xtable(AIC.sample.df), file = "Table AIC sample.tex")
 
-# Plots of distributions vs sample data
+# PLOTS
 # NOTE: the code requires a lot of time to plot gamma 1.5
 for (x in 1:length(files)){
   full_plot(x,prob_list[x],files[x],param.sample.df)
 }
 
-
-# Additional work
+# ADDITIONAL WORK
 # Altmann distribution
 minus_log_like_altmann <- function(gamma,delta){
   gamma * sum(log(x)) + delta * sum(x) + length(x)*log(sum(((1:length(x))^(-gamma)*exp(-delta*(1:length(x))))))
@@ -252,7 +235,7 @@ for (i in 1:nrow(source)){
   mle_altmann <- mle(minus_log_like_altmann,
                      start = list(gamma = 2, delta = 0.01),
                      method = "L-BFGS-B",
-                     lower = c(0.001,0.001))
+                     lower = c(0.00001,0.00001))
   alt.gamma <- attributes(summary(mle_altmann))$coef[1]
   alt.delta <- attributes(summary(mle_altmann))$coef[2]
   altmann.AIC <- get_AIC(attributes(summary(mle_altmann))$m2logL,2,length(x)) - bestAIC.list[[i]]
@@ -263,20 +246,16 @@ for (i in 1:nrow(source)){
   
   z <- 1:max(degree_sequence)
   altmann_prob <- sapply(z, altmann_dist,gamma=alt.gamma,delta=alt.delta,N=max(x))
-  lines(z,altmann_prob*nrow(degree_sequence),type="l",col = "red",lwd = 3)
+  lines(z,altmann_prob*nrow(degree_sequence),type="l",col = "blue",lwd = 3)
+  zetatrunc_prob <- sapply(z, zetatrunc_dist, gamma = param.df$`gamma 2`[i], 
+                           k_max = param.df$`k max`[i])
+  lines(z,zetatrunc_prob*nrow(degree_sequence),type="l",col = "red",lwd = 3)
+  legend("topright", legend = c("Altmann","Zeta truncated"), 
+         col = c("blue","red"), lty = 1, lwd = 2)
+  
 }
 
 colnames(altmann.param) <- c("gamma", "delta", "Alt.AIC-best.AIC")
 
 altmann.param
-print(xtable(altmann.param), file = "Table Altmann.tex")
-
-
-plot(degree_spectrum$V1,degree_spectrum,main = "Geo 0.05", xlab = "degree", 
-     ylab = "Number of vertices",log="y")
-
-z <- 1:max(degree_sequence)
-
-altmann_prob <- sapply(z, altmann_dist,gamma=0.5,delta=0.01,N=max(x))
-lines(z,altmann_prob,type="l",col = "blue")
-minus_log_like_altmann(0.5,0.01)
+print(xtable(altmann.param), file = "Table Altmann.tex", digits = c(0, 2, 3, 2))
