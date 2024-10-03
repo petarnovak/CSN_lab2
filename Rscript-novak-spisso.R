@@ -227,12 +227,6 @@ print(xtable(param.sample.df), file = "Table Parameters sample.tex")
 AIC.sample.df
 print(xtable(AIC.sample.df), file = "Table AIC sample.tex")
 
-# PLOTS
-# NOTE: the code requires a lot of time to plot gamma 1.5
-for (x in 1:length(files)){
-  full_plot(x,prob_list[x],files[x],param.sample.df)
-}
-
 # ADDITIONAL WORK
 # Altmann distribution
 minus_log_like_altmann <- function(gamma,delta){
@@ -246,7 +240,8 @@ altmann_dist <- function(gamma,delta,k,N){
 altmann.param <- data.frame()
 
 for (i in 1:nrow(source)){
-  degree_sequence <- read.table(source$file[i], header = FALSE)
+  degree_seq <- read.table(source$file[i], header = FALSE)
+  degree_spec = table(degree_seq)
   x <- degree_sequence$V1
   mle_altmann <- mle(minus_log_like_altmann,
                      start = list(gamma = 2, delta = 0.01),
@@ -256,16 +251,18 @@ for (i in 1:nrow(source)){
   alt.delta <- attributes(summary(mle_altmann))$coef[2]
   altmann.AIC <- get_AIC(attributes(summary(mle_altmann))$m2logL,2,length(x)) - bestAIC.list[[i]]
   altmann.param <- rbind(altmann.param,data.frame(alt.gamma,alt.delta,altmann.AIC))
-  degree_spectrum = table(degree_sequence)
-  barplot(degree_spectrum, main = source$language[i], xlab = "degree", 
-          ylab = "Number of vertices", log = "y")
+
+  degree <- as.numeric(names(deg_spec))  # X-axis
+  vertices <- as.numeric(deg_spec)  # Y-axis
+  plot(degree, vertices, type = "l", main = source$language[i], lwd = 2,
+       xlab = "Degree", ylab = "Number of vertices", log = "xy")
   
-  z <- 1:max(degree_sequence)
+  z <- 1:max(degree_seq)
   altmann_prob <- sapply(z, altmann_dist,gamma=alt.gamma,delta=alt.delta,N=max(x))
-  lines(z,altmann_prob*nrow(degree_sequence),type="l",col = "blue",lwd = 3)
+  lines(z,altmann_prob*nrow(degree_seq),type="l",col = "blue",lwd = 3)
   zetatrunc_prob <- sapply(z, zetatrunc_dist, gamma = param.df$`gamma 2`[i], 
                            k_max = param.df$`k max`[i])
-  lines(z,zetatrunc_prob*nrow(degree_sequence),type="l",col = "red",lwd = 3)
+  lines(z,zetatrunc_prob*nrow(degree_seq),type="l",col = "red",lwd = 3)
   legend("topright", legend = c("Altmann","Zeta truncated"), 
          col = c("blue","red"), lty = 1, lwd = 2)
   
