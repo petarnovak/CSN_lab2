@@ -151,26 +151,26 @@ full_plot <- function(i,x,label,n.samples,deg_spec,df){
        xlab = "Degree", ylab = "Number of vertices", log = "xy")
   
   geo_prob <- sapply(x, geo_dist,p=df$p[i])
-  lines(x,geo_prob*n.samples,type="l",col = "blue",lwd = 2)
+  lines(x,geo_prob*n.samples,col = "blue",lwd = 2)
   
   pois_prob <- sapply(x, pois_dist,lambda=df$lambda[i])
-  lines(x,pois_prob*n.samples,type="l",col = "green",lwd = 2)
+  lines(x,pois_prob*n.samples,col = "green",lwd = 2)
   
   zeta_prob <- sapply(x, dzeta, shape = df$`gamma 1`[i])
-  lines(x,zeta_prob*n.samples,type="l",col = "orange",lwd = 2)
+  lines(x,zeta_prob*n.samples,col = "orange",lwd = 2)
   
   zeta2_prob <- sapply(x, dzeta, shape = 2)
-  lines(x,zeta2_prob*n.samples,type="l",col = "magenta",lwd = 2)
+  lines(x,zeta2_prob*n.samples,col = "magenta",lwd = 2)
   
   zetatrunc_prob <- sapply(x, zetatrunc_dist, gamma = df$`gamma 2`[i], 
                            k_max = df$`k max`[i])
-  lines(x,zetatrunc_prob*n.samples,type="l",col = "red",lwd = 2)
+  lines(x,zetatrunc_prob*n.samples,col = "red",lwd = 2)
   legend("topright", legend = c("Data","Geometric", "Poisson", "Zeta", 
-                                "Zeta (Lambda=2)", "Zeta truncated"), 
-         col = c("black","blue","green","orange","magenta","red"), lty = 1, lwd = 2)
+                                "Zeta (Lambda=2)", "Zeta truncated","Confidence interval"), 
+         col = c("black","blue","green","orange","magenta","red","red"), 
+         lty = c(1,1,1,1,1,1,2), lwd = 2)
 }
 
-par(ask = TRUE)
 for (i in 1:nrow(source)){
   degree_sequence = read.table(source$file[i], header = FALSE)
   degree_spectrum = table(degree_sequence) 
@@ -186,7 +186,6 @@ for (i in 1:nrow(source)){
   lines(x,zetatrunc_prob*nrow(degree_sequence),col = "red",lwd = 1, lty = 2)
   
 }
-par(ask = FALSE)
 
 # SAMPLES FROM DISCRETE DISTRIBUTIONS
 folder_path <- "./samples_from_discrete_distributions/data"
@@ -208,23 +207,24 @@ print(xtable(prob.df), file = "Table sample.tex")
 # LOG-LIKELIHOOD & AIC
 param.sample.df <- data.frame() #table with best parameters
 AIC.sample.df <- data.frame() #AIC table
-bestAIC.list <- list()#list with best AIC for every distribution
+bestAIC.sample.list <- list()#list with best AIC for every distribution
 
+# (The cicle is quite slow, mainly because of the Gamma 1.5 distribution)
 for (i in 1:length(files)){
   x <- read.table(files[i], header = FALSE)$V1
   param.list <- mle_calc(prob.df$"N/M"[i],prob.df$"M/N"[i],x)
   param.sample.df <- rbind(param.sample.df,data.frame(prob.df$Distribution[i], param.list[1,],max(x)))
   AIC <- AIC_calc(prob.df$Distribution[i],param.list[2,],AIC.sample.df,x)
   AIC.sample.df <- AIC$AICdf
-  bestAIC.list[i] <- AIC$AICbest
+  bestAIC.sample.list[i] <- AIC$AICbest
 }
 
 colnames(param.sample.df) <- c("Distribution", "lambda", "p", "gamma 1","gamma 2","k max")
 colnames(AIC.sample.df) <- c("Distribution", "1", "2", "3", "4","5")
 
 param.sample.df
-print(xtable(param.sample.df), file = "Table Parameters sample.tex")
 AIC.sample.df
+print(xtable(param.sample.df), file = "Table Parameters sample.tex")
 print(xtable(AIC.sample.df), file = "Table AIC sample.tex")
 
 # ADDITIONAL WORK
@@ -242,30 +242,31 @@ altmann.param <- data.frame()
 for (i in 1:nrow(source)){
   degree_seq <- read.table(source$file[i], header = FALSE)
   degree_spec = table(degree_seq)
-  x <- degree_sequence$V1
+  x <- degree_seq$V1
   mle_altmann <- mle(minus_log_like_altmann,
                      start = list(gamma = 2, delta = 0.01),
                      method = "L-BFGS-B",
                      lower = c(0.00001,0.00001))
   alt.gamma <- attributes(summary(mle_altmann))$coef[1]
   alt.delta <- attributes(summary(mle_altmann))$coef[2]
+  
   altmann.AIC <- get_AIC(attributes(summary(mle_altmann))$m2logL,2,length(x)) - bestAIC.list[[i]]
   altmann.param <- rbind(altmann.param,data.frame(alt.gamma,alt.delta,altmann.AIC))
-
-  degree <- as.numeric(names(deg_spec))  # X-axis
-  vertices <- as.numeric(deg_spec)  # Y-axis
+  
+  degree <- as.numeric(names(degree_spec))  # X-axis
+  vertices <- as.numeric(degree_spec)  # Y-axis
   plot(degree, vertices, type = "l", main = source$language[i], lwd = 2,
        xlab = "Degree", ylab = "Number of vertices", log = "xy")
   
   z <- 1:max(degree_seq)
   altmann_prob <- sapply(z, altmann_dist,gamma=alt.gamma,delta=alt.delta,N=max(x))
-  lines(z,altmann_prob*nrow(degree_seq),type="l",col = "blue",lwd = 3)
+  lines(z,altmann_prob*nrow(degree_seq),col = "green",lwd = 3)
+  
   zetatrunc_prob <- sapply(z, zetatrunc_dist, gamma = param.df$`gamma 2`[i], 
                            k_max = param.df$`k max`[i])
-  lines(z,zetatrunc_prob*nrow(degree_seq),type="l",col = "red",lwd = 3)
-  legend("topright", legend = c("Altmann","Zeta truncated"), 
-         col = c("blue","red"), lty = 1, lwd = 2)
-  
+  lines(z,zetatrunc_prob*nrow(degree_seq),col = "red",lwd = 3)
+  legend("topright", legend = c("Data","Altmann","Zeta truncated"), 
+         col = c("black","green","red"), lty = 1, lwd = 2)
 }
 
 colnames(altmann.param) <- c("gamma", "delta", "Alt.AIC-best.AIC")
