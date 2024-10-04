@@ -120,10 +120,10 @@ full_plot <- function(i,x,label,n.samples,deg_spec,df){
   pois_prob <- sapply(x, pois_dist,lambda=df$lambda[i])
   lines(x,pois_prob*n.samples,col = "green",lwd = 2) #plot of Poisson distribution
   
-  zeta_prob <- sapply(x, dzeta, shape = df$`gamma 1`[i])
+  zeta_prob <- sapply(x, dzeta, shape = df$`gamma 1`[i]-1)
   lines(x,zeta_prob*n.samples,col = "orange",lwd = 2) #plot of Zeta distribution
   
-  zeta2_prob <- sapply(x, dzeta, shape = 2)
+  zeta2_prob <- sapply(x, dzeta, shape = 1)
   lines(x,zeta2_prob*n.samples,col = "magenta",lwd = 2) #plot of Zeta (gamma = 2) distribution
   
   zetatrunc_prob <- sapply(x, zetatrunc_dist, gamma = df$`gamma 2`[i], 
