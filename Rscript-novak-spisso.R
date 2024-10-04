@@ -194,20 +194,19 @@ for (i in 1:nrow(source)){
   zetatrunc_prob <- sapply(x, zetatrunc_dist, gamma = gamma_max, 
                            k_max = param.df$`k max`[i])
   lines(x,zetatrunc_prob*nrow(degree_sequence),col = "red",lwd = 1, lty = 2)
-  
 }
 
 # Samples from discrete distributions
 # Import the data and create the initial summary table
-folder_path <- "./samples_from_discrete_distributions/data"
-files <- list.files(path = folder_path, full.names = TRUE)
-prob_list <- c("geo 0.05","geo 0.1","geo 0.2","geo 0.4","geo 0.8","zeta 1.5","zeta 2.5",
-          "zeta 2","zeta 3.5","zeta 3")
+source.prob = read.table("list_random_samples.txt", 
+                    header = TRUE,               # this is to indicate the first line of the file contains the names of the columns instead of the real data
+                    as.is = c("distribution","file") # this is need to have the cells treated as real strings and not as categorial data.
+)
 
-prob.df <- data.frame() #Summary table with all distributions and important values
+prob.df <- data.frame() #Summary table with all languages and important values
 
-for (x in 1:length(files)) {
-  prob.df <- write_table(prob_list[x], files[x],prob.df)
+for (i in 1:nrow(source.prob)) {
+  prob.df <- write_table(source.prob$distribution[i], source.prob$file[i],prob.df)
 }
 
 colnames(prob.df) <- c("Distribution", "N", "Maximum degree", "M/N", "N/M")
@@ -220,11 +219,11 @@ AIC.sample.df <- data.frame() #AIC table
 bestAIC.sample.list <- list()#list with best AIC for every distribution
 
 # (The cicle is quite slow, mainly because of the Gamma 1.5 distribution)
-for (i in 1:length(files)){
-  x <- read.table(files[i], header = FALSE)$V1
+for (i in 1:nrow(source.prob)){
+  x <- read.table(source.prob$file[i], header = FALSE)$V1
   param.list <- mle_calc(prob.df$"N/M"[i],prob.df$"M/N"[i],x)
   param.sample.df <- rbind(param.sample.df,data.frame(prob.df$Distribution[i], param.list[1,],max(x)))
-  AIC <- AIC_calc(prob.df$Distribution[i],param.list[2,],AIC.sample.df,x)
+  AIC <- AIC_calc(prob.df$Distribution[i],param.list[3,],AIC.sample.df,x)
   AIC.sample.df <- AIC$AICdf
   bestAIC.sample.list[i] <- AIC$AICbest
 }
@@ -283,6 +282,5 @@ for (i in 1:nrow(source)){
 }
 
 colnames(altmann.param) <- c("gamma", "delta", "Alt.AIC-best.AIC")
-
 altmann.param
 print(xtable(altmann.param), file = "Table Altmann.tex", digits = c(0, 2, 3, 2))

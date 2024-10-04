@@ -1,0 +1,11 @@
+distribution file
+geo_0.05 ./data/sample_of_geometric_with_parameter_0.05.txt
+geo_0.1 ./data/sample_of_geometric_with_parameter_0.1.txt
+geo_0.2 ./data/sample_of_geometric_with_parameter_0.2.txt
+geo_0.4 ./data/sample_of_geometric_with_parameter_0.4.txt
+geo_0.8 ./data/sample_of_geometric_with_parameter_0.8.txt
+zeta_1.5 ./data/sample_of_zeta_with_parameter_1.5.txt
+zeta_2 ./data/sample_of_zeta_with_parameter_2.txt
+zeta_2.5 ./data/sample_of_zeta_with_parameter_2.5.txt
+zeta_3 ./data/sample_of_zeta_with_parameter_3.txt
+zeta_3.5 ./data/sample_of_zeta_with_parameter_3.5.txt
