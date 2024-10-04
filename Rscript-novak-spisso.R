@@ -204,7 +204,7 @@ files <- list.files(path = folder_path, full.names = TRUE)
 prob_list <- c("geo 0.05","geo 0.1","geo 0.2","geo 0.4","geo 0.8","zeta 1.5","zeta 2.5",
           "zeta 2","zeta 3.5","zeta 3")
 
-prob.df <- data.frame()
+prob.df <- data.frame() #Summary table with all distributions and important values
 
 for (x in 1:length(files)) {
   prob.df <- write_table(prob_list[x], files[x],prob.df)
@@ -214,7 +214,7 @@ colnames(prob.df) <- c("Distribution", "N", "Maximum degree", "M/N", "N/M")
 prob.df
 print(xtable(prob.df), file = "Table sample.tex")
 
-# LOG-LIKELIHOOD & AIC
+# Tables with estimated parameters and AIC
 param.sample.df <- data.frame() #table with best parameters
 AIC.sample.df <- data.frame() #AIC table
 bestAIC.sample.list <- list()#list with best AIC for every distribution
@@ -237,17 +237,20 @@ AIC.sample.df
 print(xtable(param.sample.df), file = "Table Parameters sample.tex")
 print(xtable(AIC.sample.df), file = "Table AIC sample.tex")
 
+# Plot
+#ADD PLOTS?
+
 # ADDITIONAL WORK
 # Altmann distribution
-minus_log_like_altmann <- function(gamma,delta){
-  gamma * sum(log(x)) + delta * sum(x) + length(x)*log(sum(((1:length(x))^(-gamma)*exp(-delta*(1:length(x))))))
-}
-
 altmann_dist <- function(gamma,delta,k,N){
   k^(-gamma) * exp(-delta * k) * (1/sum((1:N)^(-gamma) * exp(-delta * (1:N))))
 }
-
-altmann.param <- data.frame()
+# Altmann log-likelihood
+minus_log_like_altmann <- function(gamma,delta){
+  gamma * sum(log(x)) + delta * sum(x) + length(x)*log(sum(((1:length(x))^(-gamma)*exp(-delta*(1:length(x))))))
+}
+#Summary table with ALtmann parameters estimated for all languages
+altmann.param <- data.frame() 
 
 for (i in 1:nrow(source)){
   degree_seq <- read.table(source$file[i], header = FALSE)
