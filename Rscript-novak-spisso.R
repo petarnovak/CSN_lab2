@@ -341,7 +341,7 @@ for (i in 1:nrow(source)){
   alt.delta <- attributes(summary(mle_altmann))$coef[2]
   
   altmann.AIC <- get_AIC(attributes(summary(mle_altmann))$m2logL,2,length(x)) - bestAIC.list[[i]]
-  altmann.param <- rbind(altmann.param,data.frame(alt.gamma,alt.delta,altmann.AIC))
+  altmann.param <- rbind(altmann.param,data.frame(source$language[i],alt.gamma,alt.delta,altmann.AIC))
   
   degree <- as.numeric(names(degree_spec))  # X-axis
   vertices <- as.numeric(degree_spec)  # Y-axis
@@ -349,7 +349,7 @@ for (i in 1:nrow(source)){
        xlab = "Degree", ylab = "Number of vertices", log = "xy")
   
   z <- 1:max(degree_seq)
-  altmann_prob <- sapply(z, altmann_dist,gamma=alt.gamma,delta=alt.delta,N=max(x))
+  altmann_prob <- sapply(z, altmann_dist,gamma=alt.gamma,delta=alt.delta,N=length(x))
   lines(z,altmann_prob*nrow(degree_seq),col = "green",lwd = 3)
   
   zetatrunc_prob <- sapply(z, zetatrunc_dist, gamma = param.df$`gamma 2`[i], 
@@ -359,6 +359,6 @@ for (i in 1:nrow(source)){
          col = c("black","green","red"), lty = 1, lwd = 2)
 }
 
-colnames(altmann.param) <- c("gamma", "delta", "Alt.AIC-best.AIC")
+colnames(altmann.param) <- c("Language", "gamma", "delta", "Alt.AIC-best.AIC")
 altmann.param
 print(xtable(altmann.param), file = "Table Altmann.tex", digits = c(0, 2, 3, 2))
