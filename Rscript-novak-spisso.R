@@ -149,8 +149,8 @@ full_plot <- function(i,x,label,n.samples,deg_spec,df){
 
 # Function to plot the confidence interval for Zeta-truncated distribution
 plot_confidence_interval_zeta <- function(x, n_samples, param_row, se_row) {
-  gamma_min <- param_row$`gamma 2` - sqrt(se_row$"5")
-  gamma_max <- param_row$`gamma 2` + sqrt(se_row$"5")
+  gamma_min <- param_row$`gamma 2` - 1.96*se_row$"5"
+  gamma_max <- param_row$`gamma 2` + 1.96*se_row$"5"
   
   zetatrunc_prob_min <- sapply(x, zetatrunc_dist, gamma = gamma_min, k_max = param_row$`k max`)
   lines(x, zetatrunc_prob_min * n_samples, col = "red", lwd = 1, lty = 2)
@@ -160,8 +160,8 @@ plot_confidence_interval_zeta <- function(x, n_samples, param_row, se_row) {
 
 # Function to plot the confidence interval for the Geometric distribution
 plot_confidence_interval_geo <- function(x, n_samples, param_row, se_row) {
-  p_min <- param_row$`p` - sqrt(se_row$"2")
-  p_max <- param_row$`p` + sqrt(se_row$"2")
+  p_min <- param_row$`p` - 1.96*se_row$"2"
+  p_max <- param_row$`p` + 1.96*se_row$"2"
   
   geo_prob_min <- sapply(x, geo_dist, p = p_min)
   lines(x, geo_prob_min * n_samples, col = "blue", lwd = 1, lty = 2)
