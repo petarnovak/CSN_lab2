@@ -124,11 +124,11 @@ zetatrunc_dist <- function(k_max,gamma,k){
 }
 
 # Function to create the plots
-full_plot <- function(i,x,label,n.samples,deg_spec,df){
+full_plot <- function(i,x,label,n.samples,deg_spec,df,scale){
   degree <- as.numeric(names(deg_spec))  # X-axis
   vertices <- as.numeric(deg_spec)  # Y-axis
   plot(degree, vertices, type = "l", main = label, lwd = 2,
-       xlab = "Degree", ylab = "Number of vertices", log = "xy") #plot of real data, use log scale
+       xlab = "Degree", ylab = "Number of vertices", log = scale) #plot of real data, use the appropriate scale
   
   geo_prob <- sapply(x, geo_dist,p=df$p[i])
   lines(x,geo_prob*n.samples,col = "blue",lwd = 2) #plot of geometric distribution
@@ -145,28 +145,6 @@ full_plot <- function(i,x,label,n.samples,deg_spec,df){
   zetatrunc_prob <- sapply(x, zetatrunc_dist, gamma = df$`gamma 2`[i], 
                            k_max = df$`k max`[i]) 
   lines(x,zetatrunc_prob*n.samples,col = "red",lwd = 2) #plot of right-truncated Zeta distribution
-}
-
-# Function to plot the confidence interval for Zeta-truncated distribution
-plot_confidence_interval_zeta <- function(x, n_samples, param_row, se_row) {
-  gamma_min <- param_row$`gamma 2` - 1.96*se_row$"5"
-  gamma_max <- param_row$`gamma 2` + 1.96*se_row$"5"
-  
-  zetatrunc_prob_min <- sapply(x, zetatrunc_dist, gamma = gamma_min, k_max = param_row$`k max`)
-  lines(x, zetatrunc_prob_min * n_samples, col = "red", lwd = 1, lty = 2)
-  zetatrunc_prob_max <- sapply(x, zetatrunc_dist, gamma = gamma_max, k_max = param_row$`k max`)
-  lines(x, zetatrunc_prob_max * n_samples, col = "red", lwd = 1, lty = 2)
-}
-
-# Function to plot the confidence interval for the Geometric distribution
-plot_confidence_interval_geo <- function(x, n_samples, param_row, se_row) {
-  p_min <- param_row$`p` - 1.96*se_row$"2"
-  p_max <- param_row$`p` + 1.96*se_row$"2"
-  
-  geo_prob_min <- sapply(x, geo_dist, p = p_min)
-  lines(x, geo_prob_min * n_samples, col = "blue", lwd = 1, lty = 2)
-  geo_prob_max <- sapply(x, geo_dist, p = p_max)
-  lines(x, geo_prob_max * n_samples, col = "blue", lwd = 1, lty = 2)
 }
 
 # ------------------------------------------------------------------------------
@@ -191,7 +169,6 @@ print(xtable(lang.df), file = "Table languages.tex")
 
 # Tables with estimated parameters and AIC
 param.df <- data.frame() #table with best parameters
-se.df <- data.frame() #table with the standard errors
 AIC.df <- data.frame() #AIC table
 bestAIC.list <- list() #list with best AIC for every language
 
@@ -201,22 +178,17 @@ for (i in 1:nrow(source)){
   
   param.list <- mle_calc(lang.df$"N/M"[i],lang.df$"M/N"[i],x)
   param.df <- rbind(param.df,data.frame(source$language[i], param.list[1,],max(x)))
-  se.df <- rbind(se.df,data.frame(source$language[i], param.list[2,]))
   AIC <- AIC_calc(source$language[i],param.list[3,],AIC.df,x)
   AIC.df <- AIC$AICdf
   bestAIC.list[i] <- AIC$AICbest
 }
 
 colnames(param.df) <- c("Language", "lambda", "p", "gamma 1","gamma 2","k max")
-colnames(se.df) <- c("Language", "1", "2", "3", "5")
 colnames(AIC.df) <- c("Language", "1", "2", "3", "4", "5")
 param.df
-se.df
 AIC.df
 print(xtable(param.df), file = "Table Parameters.tex")
 print(xtable(AIC.df), file = "Table AIC.tex")
-
-
 
 # Plot
 for (i in 1:nrow(source)){
@@ -225,18 +197,25 @@ for (i in 1:nrow(source)){
   x <- 1:max(degree_sequence)
   
   #plot data and all models
-  full_plot(i, x, source$language[i], nrow(degree_sequence), degree_spectrum, param.df)
-  
-  #plot the confidence interval for Zeta-truncated distribution
-  plot_confidence_interval_zeta(x, nrow(degree_sequence), param.df[i, ], se.df[i, ])
+  full_plot(i, x, source$language[i], nrow(degree_sequence), degree_spectrum, param.df,"xy")
   
   #add legend
   legend("topright", 
-         legend = c("Data","Geometric", "Poisson", "Zeta", "Zeta (Lambda=2)", "Zeta truncated","Confidence interval"), 
-         col = c("black","blue","green","orange","magenta","red","red"), 
-         lty = c(1,1,1,1,1,1,2), lwd = 2)
+         legend = c("Data","Geometric", "Poisson", "Zeta", "Zeta (Lambda=2)", "Zeta truncated"), 
+         col = c("black","blue","green","orange","magenta","red"), 
+         lty = 1, lwd = 2)
 }
 
+# Calculation of the Akaike weights
+AIC.df
+Ak <- exp(-1/2*AIC.df[-1])
+tot_Ak <- rowSums(Ak)
+Akaike.l1 <- 1 / tot_Ak 
+Akaike.l1
+Akaike.l2 <- Ak$"3" / tot_Ak 
+Akaike.l2
+Akaike <- Ak / tot_Ak
+Akaike
 
 # Samples from discrete distributions
 # Import the data and create the initial summary table
@@ -257,7 +236,6 @@ print(xtable(prob.df), file = "Table sample.tex")
 
 # Tables with estimated parameters and AIC
 param.sample.df <- data.frame() #table with best parameters
-se.sample.df <- data.frame() #table with the standard errors
 AIC.sample.df <- data.frame() #AIC table
 bestAIC.sample.list <- list()#list with best AIC for every distribution
 
@@ -266,18 +244,15 @@ for (i in 1:nrow(source.prob)){
   x <- read.table(source.prob$file[i], header = FALSE)$V1
   param.list <- mle_calc(prob.df$"N/M"[i],prob.df$"M/N"[i],x)
   param.sample.df <- rbind(param.sample.df,data.frame(prob.df$Distribution[i], param.list[1,],max(x)))
-  se.sample.df <- rbind(se.sample.df,data.frame(source.prob$distribution[i], param.list[2,]))
   AIC <- AIC_calc(prob.df$Distribution[i],param.list[3,],AIC.sample.df,x)
   AIC.sample.df <- AIC$AICdf
   bestAIC.sample.list[i] <- AIC$AICbest
 }
 
 colnames(param.sample.df) <- c("Distribution", "lambda", "p", "gamma 1","gamma 2","k max")
-colnames(se.sample.df) <- c("Distribution", "1", "2", "3", "5")
 colnames(AIC.sample.df) <- c("Distribution", "1", "2", "3", "4","5")
 
 param.sample.df
-se.sample.df
 AIC.sample.df
 print(xtable(param.sample.df), file = "Table Parameters sample.tex")
 print(xtable(AIC.sample.df), file = "Table AIC sample.tex")
@@ -287,32 +262,23 @@ print(xtable(AIC.sample.df), file = "Table AIC sample.tex")
 # to make the code faster we do not plot it,
 # to plot it, it is sufficient to delete [-6] in the next line
 for (i in c(1:nrow(source.prob))[-6]){
+  # choice of different scales for plotting the geometric and the zeta distributions
+  if(i<6){
+    scale = "y"
+  }else{
+    scale = "xy"
+  }
   
   degree_sequence = read.table(source.prob$file[i], header = FALSE)
   degree_spectrum = table(degree_sequence) 
   x <- 1:max(degree_sequence)
   
-  full_plot(i, x, source.prob$distribution[i], nrow(degree_sequence), degree_spectrum, param.sample.df)
+  full_plot(i, x, source.prob$distribution[i], nrow(degree_sequence), degree_spectrum, param.sample.df,scale)
   
-  #plot of the standard error
-  if (i>5) { #samples from Zeta distribution
-    
-    plot_confidence_interval_zeta(x, nrow(degree_sequence), param.sample.df[i, ], se.sample.df[i, ])
-    
-    legend("topright",
-           legend = c("Data","Geometric", "Poisson", "Zeta", "Zeta (Lambda=2)", "Zeta truncated","Confidence interval"), 
-           col = c("black","blue","green","orange","magenta","red","red"), 
-           lty = c(1,1,1,1,1,1,2), lwd = 2)
-    
-  } else { #samples from geometric distribution
-    
-    plot_confidence_interval_geo(x, nrow(degree_sequence), param.sample.df[i, ], se.sample.df[i, ])
-    
-    legend("bottomleft", 
-           legend = c("Data","Geometric", "Poisson", "Zeta", "Zeta (Lambda=2)", "Zeta truncated","Confidence interval"), 
-           col = c("black","blue","green","orange","magenta","red","blue"), 
-           lty = c(1,1,1,1,1,1,2), lwd = 2)
-  }
+  legend("topright",
+         legend = c("Data","Geometric", "Poisson", "Zeta", "Zeta (Lambda=2)", "Zeta truncated"), 
+         col = c("black","blue","green","orange","magenta","red"), 
+         lty = 1, lwd = 2)
 }
 
 # ADDITIONAL WORK
@@ -336,7 +302,7 @@ for (i in 1:nrow(source)){
   mle_altmann <- mle(minus_log_like_altmann,
                      start = list(gamma = 2, delta = 0.01),
                      method = "L-BFGS-B",
-                     lower = c(0.00001,0.00001))
+                     lower = c(0.0001,0.0001))
   alt.gamma <- attributes(summary(mle_altmann))$coef[1]
   alt.delta <- attributes(summary(mle_altmann))$coef[2]
   
