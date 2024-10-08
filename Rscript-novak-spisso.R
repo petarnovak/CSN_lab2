@@ -206,16 +206,13 @@ for (i in 1:nrow(source)){
          lty = 1, lwd = 2)
 }
 
-# Calculation of the Akaike weights
-AIC.df
-Ak <- exp(-1/2*AIC.df[-1])
-tot_Ak <- rowSums(Ak)
-Akaike.l1 <- 1 / tot_Ak 
-Akaike.l1
-Akaike.l2 <- Ak$"3" / tot_Ak 
-Akaike.l2
-Akaike <- Ak / tot_Ak
-Akaike
+# Calculation of the Akaike weights for the best distributions
+# (Zeta and Right-truncated Zeta)
+Akaike.df <- exp(-1/2*AIC.df[c(4,6)]) / rowSums(exp(-1/2*AIC.df[-1]))
+Akaike.df <- cbind(AIC.df[1],Akaike.df)
+colnames(Akaike.df) <- c("Language", "Zeta", "Right-truncated Zeta")
+Akaike.df
+print(xtable(Akaike.df), file = "Table Akaike.tex")
 
 # Samples from discrete distributions
 # Import the data and create the initial summary table
@@ -300,9 +297,10 @@ for (i in 1:nrow(source)){
   degree_spec = table(degree_seq)
   x <- degree_seq$V1
   mle_altmann <- mle(minus_log_like_altmann,
-                     start = list(gamma = 2, delta = 0.01),
+                     start = list(gamma = 2, delta = 0.1),
                      method = "L-BFGS-B",
                      lower = c(0.0001,0.0001))
+  
   alt.gamma <- attributes(summary(mle_altmann))$coef[1]
   alt.delta <- attributes(summary(mle_altmann))$coef[2]
   
@@ -316,15 +314,31 @@ for (i in 1:nrow(source)){
   
   z <- 1:max(degree_seq)
   altmann_prob <- sapply(z, altmann_dist,gamma=alt.gamma,delta=alt.delta,N=length(x))
-  lines(z,altmann_prob*nrow(degree_seq),col = "green",lwd = 3)
+  lines(z,altmann_prob*nrow(degree_seq),col = "#D55E00",lwd = 3)
   
   zetatrunc_prob <- sapply(z, zetatrunc_dist, gamma = param.df$`gamma 2`[i], 
                            k_max = param.df$`k max`[i])
-  lines(z,zetatrunc_prob*nrow(degree_seq),col = "red",lwd = 3)
+  lines(z,zetatrunc_prob*nrow(degree_seq),col = "#56B4E9",lwd = 3)
   legend("topright", legend = c("Data","Altmann","Zeta truncated"), 
-         col = c("black","green","red"), lty = 1, lwd = 2)
+         col = c("black","#D55E00","#56B4E9"), lty = 1, lwd = 2)
 }
 
 colnames(altmann.param) <- c("Language", "gamma", "delta", "Alt.AIC-best.AIC")
 altmann.param
 print(xtable(altmann.param), file = "Table Altmann.tex", digits = c(0, 2, 3, 2))
+
+
+# Calculation of the new Akaike weights table, adding the Altmann distribution
+AIC.alt.df <- cbind(AIC.df[-1],altmann.param[4]) #create initial table
+colnames(AIC.alt.df)[6] <- "6"
+negative_Altmann <- AIC.alt.df[6] < 0 #rows for which Altmann is the best model
+AIC.alt.df[negative_Altmann, 1:5] <- AIC.alt.df[negative_Altmann, 1:5] - 
+  AIC.alt.df$"6"[negative_Altmann] #update AIC differences
+AIC.alt.df$"6"[AIC.alt.df[6] < 0] <- 0 #update Altmann column
+
+Akaike.alt.df <- exp(-1/2*AIC.alt.df[c(3,5,6)]) / rowSums(exp(-1/2*AIC.alt.df)) #create new Akaike table
+Akaike.alt.df <- cbind(AIC.df[1],Akaike.alt.df) #add languages column
+colnames(Akaike.alt.df) <- c("Language", "Zeta", "Right-truncated Zeta","Altmann")
+
+Akaike.alt.df
+print(xtable(Akaike.alt.df), file = "Table Akaike with Altmann.tex")
